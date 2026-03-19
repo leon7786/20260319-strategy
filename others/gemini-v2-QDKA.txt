@@ -1,0 +1,84 @@
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+def run_qdka_backtest():
+    print("正在加载 IXIC 1995-2025 日频数据，准备点火...")
+    df = yf.download('^IXIC', start='1995-01-03', end='2025-12-29')
+    df['Close'] = df['Adj Close'] if 'Adj Close' in df.columns else df['Close']
+    df['Ret'] = df['Close'].pct_change()
+    
+    # ================= 核心模块 1：只惩罚向下波动率 =================
+    # 只提取小于 0 的收益率，大于 0 的视为 0
+    df['Negative_Ret'] = np.minimum(df['Ret'], 0)
+    # 计算 21 天向下半方差 (Downside Volatility)
+    df['Downside_Vol_21d'] = df['Negative_Ret'].rolling(window=21).std() * np.sqrt(252)
+    
+    # 目标年化向下波动率设为 25% (容忍度更高，因为只算下跌)
+    TARGET_DOWN_VOL = 0.25
+    df['Target_Leverage'] = TARGET_DOWN_VOL / df['Downside_Vol_21d']
+    df['Target_Leverage'] = df['Target_Leverage'].clip(lower=0, upper=3.0) # 极限 3x 杠杆
+    
+    # ================= 核心模块 2：双重护城河 (均线 + 季度熔断) =================
+    # 护城河 1：基础牛熊分界
+    df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
+    df['EMA200'] = df['Close'].ewm(span=200, adjust=False).mean()
+    trend_filter = (df['Close'] > df['EMA200']) & (df['EMA50'] > df['EMA200'])
+    
+    # 护城河 2：冷血熔断器 (从63日高点回撤超过 12% 立即斩仓)
+    df['Rolling_Max_63d'] = df['Close'].rolling(window=63).max()
+    df['Drawdown_From_Peak'] = (df['Close'] - df['Rolling_Max_63d']) / df['Rolling_Max_63d']
+    circuit_breaker = df['Drawdown_From_Peak'] > -0.12 # 大于 -12% 时为 True (安全)
+    
+    # ================= 核心模块 3：信号合成与闲置资金生息 =================
+    # T日的目标杠杆
+    df['Leverage_T'] = np.where(trend_filter & circuit_breaker, df['Target_Leverage'], 0)
+    
+    # 严格的 T+1 执行 (防未来函数)
+    df['Actual_Leverage'] = df['Leverage_T'].shift(1).fillna(0)
+    
+    # 闲置资金去买 T-Bills (假设年化 4%，日化 4%/252)
+    DAILY_RF_RATE = 0.04 / 252
+    df['Cash_Ratio'] = np.maximum(0, 1 - df['Actual_Leverage']) 
+    
+    # 最终每日策略收益 = (杠杆 * 纳指日收益) + (闲置资金 * 无风险日收益)
+    df['Strategy_Ret'] = (df['Actual_Leverage'] * df['Ret']) + (df['Cash_Ratio'] * DAILY_RF_RATE)
+    df['BnH_Ret'] = df['Ret']
+    
+    # ================= 性能统计与对数宇宙展示 =================
+    df['Strategy_NAV'] = (1 + df['Strategy_Ret']).cumprod()
+    df['BnH_NAV'] = (1 + df['BnH_Ret']).cumprod()
+    df = df.dropna(subset=['Strategy_NAV', 'BnH_NAV'])
+    
+    years = (df.index[-1] - df.index[0]).days / 365.25
+    
+    def get_stats(returns, navs):
+        cagr = (navs.iloc[-1] ** (1/years)) - 1
+        max_dd = ((navs - navs.cummax()) / navs.cummax()).min()
+        sharpe = (returns.mean() / returns.std()) * np.sqrt(252)
+        return cagr, max_dd, sharpe
+
+    cagr_s, mdd_s, sharpe_s = get_stats(df['Strategy_Ret'], df['Strategy_NAV'])
+    cagr_b, mdd_b, sharpe_b = get_stats(df['BnH_Ret'], df['BnH_NAV'])
+
+    print(f"\n🔥🔥🔥 QDKA 终极日频回测结果 (1995-2025) 🔥🔥🔥")
+    print(f"{'-'*55}")
+    print(f"{'指标':<15} | {'QDKA 量子系统':<15} | {'买入持有 (IXIC)'}")
+    print(f"{'-'*55}")
+    print(f"{'年化收益 (CAGR)':<14} | {cagr_s*100:>12.2f}%   | {cagr_b*100:>10.2f}%")
+    print(f"{'最大回撤 (Max DD)':<14} | {mdd_s*100:>12.2f}%   | {mdd_b*100:>10.2f}%")
+    print(f"{'夏普比率 (Sharpe)':<14} | {sharpe_s:>12.2f}    | {sharpe_b:>10.2f}")
+    print(f"{'-'*55}")
+
+    plt.figure(figsize=(14, 7))
+    plt.plot(df.index, df['Strategy_NAV'], label=f'QDKA System (CAGR: {cagr_s*100:.1f}%)', color='#ff0055', linewidth=1.5)
+    plt.plot(df.index, df['BnH_NAV'], label=f'Buy & Hold (CAGR: {cagr_b*100:.1f}%)', color='#888888', alpha=0.6)
+    plt.yscale('log')
+    plt.title('QDKA vs Buy & Hold: The Power of Asymmetric Volatility (Log Scale)')
+    plt.ylabel('Cumulative NAV (Log)')
+    plt.legend()
+    plt.grid(True, which="both", ls=":", alpha=0.4)
+    plt.show()
+
+run_qdka_backtest()
