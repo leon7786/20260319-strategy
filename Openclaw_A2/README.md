@@ -59,6 +59,23 @@
 | 2025 | 21.6% | -7.9% | -5.5% | -8.1% | -5.6% | -2.5% |
 
 
+
+## 🚀 新增候选（每日多次执行 / 收盘前触发下单）
+
+> 目标：在 **无未来函数** 与 **反过拟合约束** 下，尝试超越 `25.47% | -49.59%`。
+
+| 策略 | Full CAGR | Full MaxDD | OOS CAGR (2015-2025) | OOS MaxDD |
+|---|---:|---:|---:|---:|
+| S1_BalancedBreakout | **30.24%** | **-48.78%** | 24.26% | -48.77% |
+| S2_LowDDMomentum | 28.99% | **-43.72%** | 20.18% | -43.72% |
+| S3_AggressiveEdge | 30.58% | -49.67% | 25.13% | -39.19% |
+
+对应目录：
+- `06_BalancedBreakout_DailyClose_AntiLookahead/`
+- `07_LowDDMomentum_DailyClose_AntiLookahead/`
+- `08_AggressiveEdge_DailyClose_AntiLookahead/`
+
+
 ## ✨ 策略目录（精简概要）
 
 | 编号 | 文件夹 | 概要 |
@@ -78,5 +95,8 @@ Openclaw_A2/
 ├── 02_NovaBalance_Trend12_Vol16_12_Bond9_Slip05/
 ├── 03_AlphaPulse_Trend12_Vol18_12_Bond9_Slip10/
 ├── 04_NovaBalance_Trend12_Vol16_12_Bond9_Slip10/
-└── 05_AlphaPulse_Trend12_Vol18_12_Bond6_Slip05/
+├── 05_AlphaPulse_Trend12_Vol18_12_Bond6_Slip05/
+├── 06_BalancedBreakout_DailyClose_AntiLookahead/
+├── 07_LowDDMomentum_DailyClose_AntiLookahead/
+└── 08_AggressiveEdge_DailyClose_AntiLookahead/
 ```
