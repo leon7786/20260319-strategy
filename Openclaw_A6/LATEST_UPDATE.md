@@ -1,19 +1,5 @@
-# Openclaw_A6 最新突破更新
+# LATEST_UPDATE
 
-## 当前最新冠军
-- 策略：`frontier_lb13_btv0.15_atv0.3_amax4.5_min1.75_cr-0.09_am0.14_av0.07_dd-0.3_gs0.8`
-- 最终价值：`$215,298,003.63`
-- 总收益：`2152880.04%`
-- 年化CAGR：`38.10%`
-- 年化波动：`58.36%`
-- 最大回撤：`-66.83%`
-- 夏普：`0.84`
-- 最差8分段收益：`49.16%`
-- 平均8分段收益：`280.56%`
+> ⚠️ Audit warning: 当前这条月度 NASDAQ 策略线使用了 `BOND_ANNUAL` 年度映射折算 bond-side 月收益，存在 future leak / 前视偏差。以下指标暂不可视为有效实盘或严谨回测结果，需重算。
 
-## 对比上一任冠军
-- 上一任：`37.55% CAGR / -71.11% MaxDD`
-- 最新：`38.10% CAGR / -66.83% MaxDD`
-
-## 说明
-本轮 frontier refine 不是单纯追收益，而是在当前冠军附近加入轻量 soft drawdown throttle，并按收益/回撤双目标筛 frontier。结果实现了 CAGR 继续抬升，同时最大回撤明显改善。
+详见 `AUDIT_WARNING.md`。

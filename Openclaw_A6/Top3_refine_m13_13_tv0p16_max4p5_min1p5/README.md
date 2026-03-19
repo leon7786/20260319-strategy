@@ -1,3 +1,5 @@
+> ⚠️ Audit warning: 当前这条月度 NASDAQ 策略线使用了 `BOND_ANNUAL` 年度映射折算 bond-side 月收益，存在 future leak / 前视偏差。以下指标暂不可视为有效实盘或严谨回测结果，需重算。
+
 # Top3_refine_m13_13_tv0p16_max4p5_min1p5
 
 ## 策略简介
