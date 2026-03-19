@@ -1,0 +1,25 @@
+{
+  "decision": {
+    "date": "2025-12-31",
+    "risk_asset": "^IXIC",
+    "risk_off_asset": "VUSTX",
+    "target_asset": "RISK",
+    "target_leverage": 3.0,
+    "rv": 0.02,
+    "target_vol": 0.22768199999999997,
+    "risk_on": true,
+    "risk_off_ok": true,
+    "mode": "DRY_RUN",
+    "approved": true,
+    "risk_reasons": [
+      "risk checks passed"
+    ]
+  },
+  "orders": [
+    {
+      "action": "ENTER",
+      "asset": "RISK",
+      "leverage": 3.0
+    }
+  ]
+}
