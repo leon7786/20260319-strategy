@@ -1,0 +1,2 @@
+策略,最终价值,总收益,年化CAGR,年化波动,最大回撤,夏普,参数_mom_fast,参数_mom_slow,参数_vol_window,参数_target_vol,参数_max_lev,参数_min_lev,参数_bonus,参数_crash_filter,参数_crash_cooldown
+refine_m13_13_vw2_tv0.17_max4.5_min2.0_b0.0_cr-0.09_cd1_bond2x_pos,"$74,187,047.37",741770.47%,33.42%,59.36%,-73.67%,0.79,13,13,2,0.17,4.5,2.0,0.0,-0.09,1
