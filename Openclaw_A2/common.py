@@ -9,9 +9,37 @@ END = pd.Timestamp("2025-12-29")
 
 def load_monthly_data():
     """加载 IXIC + VUSTX 日线，并对齐后转月线。"""
-    project_root = Path(__file__).resolve().parents[2]
-    ixic_path = project_root / "data" / "IXIC_daily_yf.csv"
-    bond_path = project_root / "data" / "VUSTX_daily_yf.csv"
+    import os
+
+    # common.py 位于 repo/Openclaw_A2/common.py，repo 根目录是 parents[1]
+    repo_root = Path(__file__).resolve().parents[1]
+
+    # 数据目录优先级：
+    # 1) 环境变量 STRATEGY_DATA_DIR
+    # 2) 当前仓库 data/
+    # 3) 已有回测项目 /root/projects/20260318IXIC/data/
+    candidate_dirs = []
+    env_dir = os.getenv("STRATEGY_DATA_DIR")
+    if env_dir:
+        candidate_dirs.append(Path(env_dir))
+    candidate_dirs.append(repo_root / "data")
+    candidate_dirs.append(Path("/root/projects/20260318IXIC/data"))
+
+    ixic_path = None
+    bond_path = None
+    for d in candidate_dirs:
+        ix = d / "IXIC_daily_yf.csv"
+        bd = d / "VUSTX_daily_yf.csv"
+        if ix.exists() and bd.exists():
+            ixic_path = ix
+            bond_path = bd
+            break
+
+    if ixic_path is None or bond_path is None:
+        raise FileNotFoundError(
+            "找不到 IXIC_daily_yf.csv / VUSTX_daily_yf.csv。"
+            "可设置 STRATEGY_DATA_DIR 或把数据放到 repo/data/"
+        )
 
     ixic = (
         pd.read_csv(ixic_path, parse_dates=["Date"])
