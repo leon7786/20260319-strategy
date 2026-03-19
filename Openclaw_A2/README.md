@@ -6,9 +6,12 @@
 
 | 策略 | 最终价值 | 总收益 | 年化CAGR | 最大回撤 | 夏普 |
 |---|---:|---:|---:|---:|---:|
+| **S5_Alpha_Strike (NEW)** | $49,703,552 | 496,935.5% | **31.61%** | **-48.45%** | 0.95 |
 | S3_AggressiveEdge | $38,939,358 | 389,293.6% | 30.58% | -49.67% | 0.93 |
 | **S1_BalancedBreakout** | $35,898,857 | 358,888.6% | 30.24% | -48.78% | 0.98 |
+| S6_Balanced_Plus (NEW) | $24,246,270 | 242,362.7% | 28.60% | -47.87% | 0.93 |
 | S2_LowDDMomentum | $26,663,412 | 266,534.1% | 28.99% | -43.72% | 0.97 |
+| S4_Defensive_Armor (NEW) | $12,577,942 | 125,679.4% | 25.90% | -43.31% | 0.94 |
 | Top5 · AlphaPulse (Bond6) | $2,206,836 | 21,968.4% | 19.02% | -68.78% | 0.64 |
 | Top1 · AlphaPulse | $1,996,343 | 19,863.4% | 18.64% | -66.99% | 0.63 |
 | Top2 · NovaBalance | $1,964,628 | 19,546.3% | 18.58% | -64.51% | 0.63 |
@@ -72,6 +75,9 @@
 | 03 | `03_AlphaPulse_Trend12_Vol18_12_Bond9_Slip10` | Top1 高滑点压力测试 |
 | 04 | `04_NovaBalance_Trend12_Vol16_12_Bond9_Slip10` | Top2 高滑点压力测试 |
 | 05 | `05_AlphaPulse_Trend12_Vol18_12_Bond6_Slip05` | 债券动量窗口更短版本 |
+| 09 | `09_S4_Defensive_Armor` | 新增防守型：回撤明显更低（-43.31%） |
+| 10 | `10_S5_Alpha_Strike` | 新增进攻型：收益与回撤双维度优于 S1 |
+| 11 | `11_S6_Balanced_Plus` | 新增均衡型：收益/回撤折中优化版本 |
 
 
 ## 🧬 S1 是如何诞生的？(Evolution of S1)
@@ -106,7 +112,10 @@ Openclaw_A2/
 ├── 05_AlphaPulse_Trend12_Vol18_12_Bond6_Slip05/
 ├── 06_BalancedBreakout_DailyClose_AntiLookahead/
 ├── 07_LowDDMomentum_DailyClose_AntiLookahead/
-└── 08_AggressiveEdge_DailyClose_AntiLookahead/
+├── 08_AggressiveEdge_DailyClose_AntiLookahead/
+├── 09_S4_Defensive_Armor/
+├── 10_S5_Alpha_Strike/
+└── 11_S6_Balanced_Plus/
 ```
 
 
