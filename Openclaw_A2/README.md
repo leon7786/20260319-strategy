@@ -108,3 +108,82 @@ Openclaw_A2/
 ├── 07_LowDDMomentum_DailyClose_AntiLookahead/
 └── 08_AggressiveEdge_DailyClose_AntiLookahead/
 ```
+
+
+## 🔬 终极自我审查 (Self-Audit with Pure Daily Shift)
+
+很多开源策略把指标和交易写在同一天（T日信号T日吃收益）造成未来函数。为了彻底自证清白，本仓库提供的 `strategy.py` 以及下方的自查脚本，严格将所有技术指标（MA、Momentum、Vol、Drawdown）计算完毕后，统一执行 **`.shift(1)`**。也就是说，只有在 **T-1 日收盘后**能看到的数据，才会用来决定 **T 日**的杠杆和仓位。
+
+你可以随时用以下最极简、无任何封装的 Pandas 脚本来交叉验证 S1 的真实收益（确保无未来函数、有摩擦成本）：
+
+```python
+import pandas as pd, numpy as np
+import yfinance as yf
+
+# 1. 下载最纯粹的日线数据
+ix = yf.download('^IXIC', start='1995-01-03', end='2025-12-29', interval='1d', auto_adjust=True, progress=False)['Close'].dropna()
+bd = yf.download('VUSTX', start='1995-01-03', end='2025-12-29', interval='1d', auto_adjust=True, progress=False)['Close'].dropna()
+df = pd.concat([ix.rename('IXIC'), bd.rename('BOND')], axis=1).dropna()
+rix, rb = df['IXIC'].pct_change().fillna(0), df['BOND'].pct_change().fillna(0)
+
+# 2. S1 核心参数
+p = {
+    'ma_w': 273, 'mom_w': 40, 'mom_thr': -0.05, 'vol_w': 21, 
+    'tv_str': 0.16, 'tv_wk': 0.14, 'min_lev': 0.1, 'max_lev': 2.8, 
+    'blook': 84, 'bmult': 2.0, 'slip': 0.0008, 'month_cost': 0.0015, 
+    'dd_w': 252, 'dd_thr': -0.30, 'dd_lev_cut': 0.7, 'panic_mom_w': 20, 'panic_mom_thr': 0.0
+}
+
+# 3. T 日指标计算
+ma = df['IXIC'].rolling(p['ma_w']).mean()
+mom = df['IXIC'] / df['IXIC'].shift(p['mom_w']) - 1
+vol = rix.rolling(p['vol_w']).std()
+rh = df['IXIC'].rolling(p['dd_w']).max()
+bm = df['BOND'] / df['BOND'].shift(p['blook']) - 1
+pm = df['IXIC'] / df['IXIC'].shift(p['panic_mom_w']) - 1
+
+# 4. 核心：全部指标强行 Shift(1) 退后一天，杜绝未来函数
+ma_prev, mom_prev, vol_prev = ma.shift(1), mom.shift(1), vol.shift(1)
+rh_prev, bm_prev, pm_prev = rh.shift(1), bm.shift(1), pm.shift(1)
+ix_prev = df['IXIC'].shift(1)
+
+nav = np.full(len(df), np.nan); nav[0] = 10000.0; v = 10000.0; inr = False
+cost = p['month_cost'] / 21; bcost = (0.0006 * p['bmult']) / 21
+tvs, tvw = p['tv_str'] / np.sqrt(21), p['tv_wk'] / np.sqrt(21)
+
+# 5. 日频滚动回测
+for i in range(1, len(df)):
+    tv = tvs if df.index[i-1].month in (11, 12, 1, 2, 3, 4) else tvw
+    
+    # 风险开关 (基于 T-1)
+    risk = False
+    if pd.notna(ma_prev.iloc[i]) and pd.notna(mom_prev.iloc[i]):
+        risk = (ix_prev.iloc[i] > ma_prev.iloc[i]) and (mom_prev.iloc[i] > p['mom_thr'])
+    if pd.notna(pm_prev.iloc[i]) and pm_prev.iloc[i] < p['panic_mom_thr']:
+        risk = False
+        
+    # 动态杠杆与熔断 (基于 T-1)
+    lev = p['min_lev']
+    if pd.notna(vol_prev.iloc[i]) and vol_prev.iloc[i] > 1e-12:
+        lev = tv / vol_prev.iloc[i]
+    lev = max(p['min_lev'], min(p['max_lev'], lev))
+    if pd.notna(rh_prev.iloc[i]) and rh_prev.iloc[i] > 0 and (ix_prev.iloc[i] / rh_prev.iloc[i] - 1) < p['dd_thr']:
+        lev = max(p['min_lev'], min(p['max_lev'], lev * p['dd_lev_cut']))
+        
+    # 执行当天的真实涨跌 (T 日)
+    turn = 1.0 if risk != inr else 0.0; inr = risk
+    if risk:
+        v *= (1 + rix.iloc[i] * lev - cost * lev - p['slip'] * turn)
+    else:
+        if pd.notna(bm_prev.iloc[i]) and bm_prev.iloc[i] > 0:
+            v *= (1 + rb.iloc[i] * p['bmult'] - bcost - p['slip'] * turn)
+        else:
+            v *= (1 - p['slip'] * turn)
+    nav[i] = max(v, 1.0)
+
+nav_s = pd.Series(nav, index=df.index)
+cagr = (nav_s.iloc[-1] / 10000.0) ** (1 / ((df.index[-1] - df.index[0]).days / 365.25)) - 1
+dd = (nav_s / nav_s.cummax() - 1).min()
+print(f"S1 Pure Daily Reality Check -> CAGR: {cagr*100:.2f}% | Max DD: {dd*100:.2f}%")
+```
+
