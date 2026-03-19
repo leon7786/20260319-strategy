@@ -44,3 +44,11 @@
 cd Openclaw_A2/03_AlphaPulse_Trend12_Vol18_12_Bond9_Slip10
 python3 strategy.py
 ```
+
+
+## 🆚 与 Buy&Hold 对比
+
+| 策略 | 最终价值 | 总收益 | 年化CAGR | 最大回撤 | 夏普 |
+|---|---:|---:|---:|---:|---:|
+| Top3 · AlphaPulse (High Slip) | $10,917,428 | 109,074.3% | 25.39% | -49.68% | 0.76 |
+| Buy&Hold | $310,836 | 3,008.4% | 11.76% | -75.04% | 0.62 |

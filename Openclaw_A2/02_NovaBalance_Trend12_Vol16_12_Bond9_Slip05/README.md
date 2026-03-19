@@ -44,3 +44,11 @@
 cd Openclaw_A2/02_NovaBalance_Trend12_Vol16_12_Bond9_Slip05
 python3 strategy.py
 ```
+
+
+## 🆚 与 Buy&Hold 对比
+
+| 策略 | 最终价值 | 总收益 | 年化CAGR | 最大回撤 | 夏普 |
+|---|---:|---:|---:|---:|---:|
+| Top2 · NovaBalance | $11,054,837 | 110,448.4% | 25.44% | -49.82% | 0.77 |
+| Buy&Hold | $310,836 | 3,008.4% | 11.76% | -75.04% | 0.62 |

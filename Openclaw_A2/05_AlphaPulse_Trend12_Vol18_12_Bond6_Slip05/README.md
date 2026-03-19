@@ -44,3 +44,11 @@
 cd Openclaw_A2/05_AlphaPulse_Trend12_Vol18_12_Bond6_Slip05
 python3 strategy.py
 ```
+
+
+## 🆚 与 Buy&Hold 对比
+
+| 策略 | 最终价值 | 总收益 | 年化CAGR | 最大回撤 | 夏普 |
+|---|---:|---:|---:|---:|---:|
+| Top5 · AlphaPulse (Bond6) | $10,761,002 | 107,510.0% | 25.33% | -50.75% | 0.76 |
+| Buy&Hold | $310,836 | 3,008.4% | 11.76% | -75.04% | 0.62 |
