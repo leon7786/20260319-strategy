@@ -1,0 +1,95 @@
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+def run_akvd_backtest():
+    print("正在下载 IXIC 1995-2025 日频数据...")
+    # 获取纳斯达克综合指数数据
+    df = yf.download('^IXIC', start='1995-01-03', end='2025-12-29')
+    
+    # 提取收盘价计算日收益率
+    df['Close'] = df['Adj Close'] if 'Adj Close' in df.columns else df['Close']
+    df['Daily_Return'] = df['Close'].pct_change()
+    
+    # ----------------- 1. 宏观环境过滤 (EMA 200 & 50) -----------------
+    df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
+    df['EMA200'] = df['Close'].ewm(span=200, adjust=False).mean()
+    # 只有收盘价和50日均线都在200日均线之上，宏观环境才为1 (牛市)
+    df['Bull_Regime'] = np.where((df['Close'] > df['EMA200']) & (df['EMA50'] > df['EMA200']), 1, 0)
+    
+    # ----------------- 2. 动能评分 (多周期) -----------------
+    # 63日(1季度), 126日(半年), 252日(一年)
+    df['Mom_63'] = df['Close'].pct_change(63)
+    df['Mom_126'] = df['Close'].pct_change(126)
+    df['Mom_252'] = df['Close'].pct_change(252)
+    # 简单加权动量得分 (>0 为正向动能)
+    df['Mom_Score'] = (df['Mom_63'] * 0.2 + df['Mom_126'] * 0.3 + df['Mom_252'] * 0.5)
+    df['Mom_Filter'] = np.where(df['Mom_Score'] > 0, 1, 0)
+    
+    # ----------------- 3. 波动率自适应杠杆 (Volatility Targeting) -----------------
+    TARGET_VOL = 0.40 # 目标年化波动率 40%
+    MAX_LEVERAGE = 3.0 # 最大杠杆 3x
+    
+    # 计算过去20个交易日的年化实际波动率
+    df['Realized_Vol_20d'] = df['Daily_Return'].rolling(window=20).std() * np.sqrt(252)
+    
+    # 根据波动率计算应有杠杆 (波动率越低，杠杆越高；波动率飙升，自动降杠杆)
+    df['Target_Leverage'] = TARGET_VOL / df['Realized_Vol_20d']
+    df['Target_Leverage'] = df['Target_Leverage'].clip(lower=0, upper=MAX_LEVERAGE)
+    
+    # ----------------- 4. 最终信号合成与 T+1 执行 (防未来函数) -----------------
+    # T日的理论目标仓位 = 牛市环境 * 正向动能 * 自适应杠杆
+    df['Target_Position_T'] = df['Bull_Regime'] * df['Mom_Filter'] * df['Target_Leverage']
+    
+    # 核心防未来函数：T日的分析决定T+1日的仓位 (.shift(1))
+    df['Actual_Position'] = df['Target_Position_T'].shift(1).fillna(0)
+    
+    # ----------------- 5. 收益计算与评估 -----------------
+    df['Strategy_Return'] = df['Actual_Position'] * df['Daily_Return']
+    df['BnH_Return'] = df['Daily_Return'] # 买入持有(基准)
+    
+    # 计算累计净值
+    df['Strategy_NetValue'] = (1 + df['Strategy_Return']).cumprod()
+    df['BnH_NetValue'] = (1 + df['BnH_Return']).cumprod()
+    
+    # 删除无效的早期数据(因为252日动量需要一年数据预热)
+    df = df.dropna(subset=['Strategy_NetValue', 'BnH_NetValue'])
+    
+    # --------- 性能统计 ---------
+    years = (df.index[-1] - df.index[0]).days / 365.25
+    
+    def calc_metrics(returns, net_values):
+        cagr = (net_values.iloc[-1] ** (1 / years)) - 1
+        roll_max = net_values.cummax()
+        drawdown = (net_values - roll_max) / roll_max
+        max_dd = drawdown.min()
+        sharpe = (returns.mean() / returns.std()) * np.sqrt(252)
+        return cagr, max_dd, sharpe
+
+    strat_cagr, strat_mdd, strat_sharpe = calc_metrics(df['Strategy_Return'], df['Strategy_NetValue'])
+    bnh_cagr, bnh_mdd, bnh_sharpe = calc_metrics(df['BnH_Return'], df['BnH_NetValue'])
+    
+    print("\n" + "="*40)
+    print("1995-2025 日频回测结果对比")
+    print("="*40)
+    print(f"{'指标':<15} | {'AKVD 策略':<15} | {'买入持有 (IXIC)':<15}")
+    print("-" * 45)
+    print(f"{'年化收益率 (CAGR)':<12} | {strat_cagr*100:>10.2f}% | {bnh_cagr*100:>10.2f}%")
+    print(f"{'最大回撤 (Max DD)':<12} | {strat_mdd*100:>10.2f}% | {bnh_mdd*100:>10.2f}%")
+    print(f"{'夏普比率 (Sharpe)':<12} | {strat_sharpe:>10.2f}  | {bnh_sharpe:>10.2f}")
+    print("="*40)
+
+    # 绘制资金曲线
+    plt.figure(figsize=(12, 6))
+    plt.plot(df.index, df['Strategy_NetValue'], label='AKVD Strategy (Max 3x Adaptive)', color='blue')
+    plt.plot(df.index, df['BnH_NetValue'], label='Buy & Hold (1x IXIC)', color='gray', alpha=0.7)
+    plt.yscale('log') # 使用对数坐标轴展示真实复利效果
+    plt.title('Log-Scale Performance: AKVD Strategy vs Buy & Hold (1995-2025)')
+    plt.ylabel('Cumulative Net Value (Log)')
+    plt.legend()
+    plt.grid(True, which="both", ls="--", alpha=0.5)
+    plt.show()
+
+# 运行回测
+run_akvd_backtest()
