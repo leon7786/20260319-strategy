@@ -1,0 +1,27 @@
+[Unit]
+Description=S1 BalancedBreakout Live Daemon (Pre-close trigger)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/projects/20260319-strategy
+ExecStart=/usr/bin/python3 /root/projects/20260319-strategy/Openclaw_A2/06_BalancedBreakout_DailyClose_AntiLookahead/live_daemon.py --broker alpaca --poll-sec 120
+Restart=always
+RestartSec=5
+User=root
+Environment=PYTHONUNBUFFERED=1
+Environment=S1_TZ=America/New_York
+Environment=S1_PRECLOSE_START=15:50
+Environment=S1_PRECLOSE_END=16:00
+Environment=S1_SIGNAL_RISK=^IXIC
+Environment=S1_SIGNAL_BOND=TLT
+Environment=S1_TRADE_RISK=QQQ
+Environment=S1_TRADE_BOND=TLT
+Environment=S1_MIN_REBALANCE=0.01
+# 必填：你的 Alpaca API
+# Environment=ALPACA_API_KEY=xxx
+# Environment=ALPACA_API_SECRET=xxx
+# Environment=ALPACA_BASE_URL=https://paper-api.alpaca.markets
+
+[Install]
+WantedBy=multi-user.target
