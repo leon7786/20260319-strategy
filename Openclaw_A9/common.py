@@ -236,3 +236,121 @@ def run_akvd_backtest(strategy_name, strategy_dir, params=None):
     }
     (outdir / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2))
     return summary
+
+
+def load_bond_data():
+    repo_cache = ROOT.parent / 'data' / 'VUSTX_daily_yf.csv'
+    if repo_cache.exists():
+        df = pd.read_csv(repo_cache, parse_dates=['Date']).set_index('Date').sort_index()
+        df.index = pd.to_datetime(df.index).tz_localize(None)
+        return df['Close'].rename('BOND'), 'repo_cache'
+
+    raw = yf.download('VUSTX', start=START, end=END, auto_adjust=False, progress=False)
+    if isinstance(raw.columns, pd.MultiIndex):
+        raw.columns = raw.columns.get_level_values(0)
+    s = raw['Close'].copy().squeeze()
+    s.index = pd.to_datetime(s.index).tz_localize(None)
+    return s.rename('BOND'), 'download'
+
+
+def run_a9_hybrid_backtest(strategy_name, params, strategy_dir):
+    strategy_dir = Path(strategy_dir)
+    outdir = strategy_dir / 'results'
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    ixic_df, ixic_source = load_ixic_data()
+    bond_close, bond_source = load_bond_data()
+
+    df = pd.concat([
+        ixic_df.loc[(ixic_df.index >= pd.Timestamp(START)) & (ixic_df.index <= pd.Timestamp(END)), 'Close'].rename('IXIC'),
+        bond_close.rename('BOND')
+    ], axis=1).dropna().copy()
+
+    df['Ret_IXIC'] = df['IXIC'].pct_change()
+    df['Ret_BOND'] = df['BOND'].pct_change()
+    df['Negative_Ret'] = np.minimum(df['Ret_IXIC'], 0)
+    df['Downside_Vol'] = df['Negative_Ret'].rolling(window=params['downside_window']).std() * np.sqrt(252)
+
+    strong_months = df.index.month.isin(params.get('strong_months', [11, 12, 1, 2, 3, 4]))
+    df['Target_Down_Vol'] = np.where(strong_months, params['target_down_vol_strong'], params['target_down_vol_weak'])
+    df['Base_Leverage'] = (df['Target_Down_Vol'] / df['Downside_Vol']).clip(lower=0, upper=params['max_lev'])
+
+    df[f"EMA{params['ema_fast']}"] = df['IXIC'].ewm(span=params['ema_fast'], adjust=False).mean()
+    df[f"EMA{params['ema_slow']}"] = df['IXIC'].ewm(span=params['ema_slow'], adjust=False).mean()
+    trend_filter = (df['IXIC'] > df[f"EMA{params['ema_slow']}"]) & (df[f"EMA{params['ema_fast']}"] > df[f"EMA{params['ema_slow']}"])
+
+    df[f"Rolling_Max_{params['dd_window']}"] = df['IXIC'].rolling(window=params['dd_window']).max()
+    df['Drawdown_From_Peak'] = (df['IXIC'] - df[f"Rolling_Max_{params['dd_window']}"]) / df[f"Rolling_Max_{params['dd_window']}"]
+    lev_multiplier = np.where(df['Drawdown_From_Peak'] <= -params['dd_soft'], params['dd_lev_cut'], 1.0)
+
+    df[f"Panic_Mom_{params['panic_window']}"] = df['IXIC'].pct_change(params['panic_window'])
+    panic_filter = df[f"Panic_Mom_{params['panic_window']}"] > params['panic_thr']
+    risk_on = trend_filter & panic_filter
+
+    df['Target_Lev_IXIC'] = np.where(risk_on, df['Base_Leverage'] * lev_multiplier, 0.0)
+
+    df[f"Bond_Mom_{params['bond_lookback']}"] = df['BOND'].pct_change(params['bond_lookback'])
+    bond_on = (~risk_on) & (df[f"Bond_Mom_{params['bond_lookback']}"] > 0)
+    df['Target_Lev_BOND'] = np.where(bond_on, params['bond_lev'], 0.0)
+
+    df['Actual_Lev_IXIC'] = df['Target_Lev_IXIC'].shift(1).fillna(0)
+    df['Actual_Lev_BOND'] = df['Target_Lev_BOND'].shift(1).fillna(0)
+    df['Cash_Ratio'] = np.maximum(0, 1 - (df['Actual_Lev_IXIC'] + df['Actual_Lev_BOND']))
+
+    daily_rf = params['rf_annual'] / 252
+    df['Strategy_Ret'] = (
+        df['Actual_Lev_IXIC'] * df['Ret_IXIC']
+        + df['Actual_Lev_BOND'] * df['Ret_BOND']
+        + df['Cash_Ratio'] * daily_rf
+    )
+    df['BnH_Ret'] = df['Ret_IXIC']
+    df['Strategy_NAV'] = (1 + df['Strategy_Ret']).cumprod()
+    df['BnH_NAV'] = (1 + df['BnH_Ret']).cumprod()
+    df = df.dropna(subset=['Strategy_NAV', 'BnH_NAV']).copy()
+
+    years = (df.index[-1] - df.index[0]).days / 365.25
+    cagr_s, mdd_s, sharpe_s = get_stats(df['Strategy_Ret'], df['Strategy_NAV'], years)
+    cagr_b, mdd_b, sharpe_b = get_stats(df['BnH_Ret'], df['BnH_NAV'], years)
+
+    plt.figure(figsize=(14, 7))
+    plt.plot(df.index, df['Strategy_NAV'], label=f"{strategy_name} (CAGR: {cagr_s*100:.1f}%)", color='#13aa52', linewidth=1.6)
+    plt.plot(df.index, df['BnH_NAV'], label=f"Buy & Hold IXIC (CAGR: {cagr_b*100:.1f}%)", color='#888888', alpha=0.6)
+    plt.yscale('log')
+    plt.title(f'{strategy_name} vs Buy & Hold (Log Scale)')
+    plt.ylabel('Cumulative NAV (Log)')
+    plt.legend()
+    plt.grid(True, which='both', ls=':', alpha=0.4)
+    plot_path = outdir / 'strategy_vs_buyhold.png'
+    plt.savefig(plot_path, dpi=160, bbox_inches='tight')
+    plt.close()
+
+    equity_path = outdir / 'equity_curve.csv'
+    df[['IXIC', 'BOND', 'Actual_Lev_IXIC', 'Actual_Lev_BOND', 'Cash_Ratio', 'Strategy_Ret', 'BnH_Ret', 'Strategy_NAV', 'BnH_NAV']].to_csv(equity_path)
+
+    summary = {
+        'strategy_name': strategy_name,
+        'data_source': {'ixic': ixic_source, 'bond': bond_source},
+        'start': str(df.index[0].date()),
+        'end': str(df.index[-1].date()),
+        'bars': int(len(df)),
+        'params': params,
+        'strategy': {
+            'cagr': cagr_s,
+            'max_drawdown': mdd_s,
+            'sharpe': sharpe_s,
+            'final_nav': float(df['Strategy_NAV'].iloc[-1]),
+        },
+        'buy_hold': {
+            'cagr': cagr_b,
+            'max_drawdown': mdd_b,
+            'sharpe': sharpe_b,
+            'final_nav': float(df['BnH_NAV'].iloc[-1]),
+        },
+        'files': {
+            'equity_curve_csv': str(equity_path),
+            'plot_png': str(plot_path),
+            'summary_json': str(outdir / 'summary.json'),
+        },
+    }
+    (outdir / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2))
+    return summary
