@@ -25,6 +25,8 @@
 | 06 | `no6_A9_HybridBalanced_CAGR31_DD38` | A9 新设计平衡版 | 31.68% | -38.97% | 1.12 | 更偏现实可持有，回撤控制更好 |
 | 07 | `no7_A9_HybridAggressive_CAGR34_DD43` | A9 新设计进攻版 | 34.80% | -43.35% | 1.11 | 比旧 no4 更强的进攻升级版 |
 | 08 | `no8_A9_HybridRobust_CAGR35_DD44` | A9 新设计综合最强版 | 35.65% | -44.85% | 1.10 | 在 full/OOS/walk-forward 合成评分下第一 |
+| 09 | `no9_A9_Defensive_CAGR18_DD25` | A9 新设计防守版 | 18.01% | -25.21% | 1.02 | 牺牲部分收益换低回撤与持有舒适度 |
+| 10 | `no10_A9_OOSCore_CAGR31_DD37` | A9 新设计 OOS 主力版 | 31.31% | -37.01% | 1.13 | 更重视 2015+ / 2020+ OOS 稳定性 |
 
 
 ## A9 v2 新增策略（本轮新增）
@@ -43,6 +45,8 @@
 - **no6** → 更偏现实可持有 / 回撤控制更好
 - **no7** → 更偏高质量进攻版
 - **no8** → 在 full / OOS / walk-forward 合成评分下最强
+- **no9** → A9 防守分支，明显压回撤
+- **no10** → A9 OOS 主力分支，偏稳健的高质量收益版本
 
 ## 目录结构
 
@@ -58,7 +62,9 @@ Openclaw_A9/
 ├── no6_A9_HybridBalanced_CAGR31_DD38/
 ├── no7_A9_HybridAggressive_CAGR34_DD43/
 ├── no8_A9_HybridRobust_CAGR35_DD44/
-└── ... (future no9 / no10 / more)
+├── no9_A9_Defensive_CAGR18_DD25/
+├── no10_A9_OOSCore_CAGR31_DD37/
+└── ... (future more)
 ```
 
 ## 运行方式
